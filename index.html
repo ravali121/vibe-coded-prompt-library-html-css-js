@@ -25,6 +25,12 @@
             <button type="submit" id="save-prompt">Save Prompt</button>
         </form>
         <hr>
+        <div class="export-import-controls" style="margin-bottom:20px;text-align:center;">
+            <button id="export-prompts" type="button">Export Prompts</button>
+            <input id="import-file" type="file" accept="application/json" style="display:none;">
+            <button id="import-prompts" type="button">Import Prompts</button>
+            <span id="import-status" style="margin-left:10px;color:#b00;"></span>
+        </div>
         <div id="prompts-list" class="prompts-list"></div>
     </div>
     <script src="app.js"></script>

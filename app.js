@@ -7,6 +7,148 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelInput = document.getElementById('prompt-model');
     const promptsList = document.getElementById('prompts-list');
 
+        // Export/Import UI elements
+        const exportBtn = document.getElementById('export-prompts');
+        const importBtn = document.getElementById('import-prompts');
+        const importFile = document.getElementById('import-file');
+        const importStatus = document.getElementById('import-status');
+
+        if (exportBtn) {
+            exportBtn.onclick = () => {
+                exportPrompts();
+                importStatus.textContent = '';
+            };
+        }
+        if (importBtn && importFile) {
+            importBtn.onclick = () => {
+                importFile.value = '';
+                importFile.click();
+            };
+            importFile.onchange = () => {
+                const file = importFile.files[0];
+                if (!file) return;
+                importStatus.textContent = 'Importing...';
+                importPromptsFromFile(file, (success, msg) => {
+                    importStatus.textContent = success ? 'Import successful!' : `Import failed: ${msg}`;
+                    setTimeout(() => { importStatus.textContent = ''; }, 4000);
+                });
+            };
+        }
+
+        // --- Export/Import System ---
+        const EXPORT_VERSION = '1.0';
+
+        function getPromptStats(prompts) {
+            const totalPrompts = prompts.length;
+            const ratings = prompts.map(p => p.rating || 0);
+            const averageRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0;
+            const modelCounts = {};
+            prompts.forEach(p => {
+                const model = p.metadata?.model || 'N/A';
+                modelCounts[model] = (modelCounts[model] || 0) + 1;
+            });
+            let mostUsedModel = 'N/A';
+            let maxCount = 0;
+            for (const [model, count] of Object.entries(modelCounts)) {
+                if (count > maxCount) {
+                    mostUsedModel = model;
+                    maxCount = count;
+                }
+            }
+            return { totalPrompts, averageRating, mostUsedModel };
+        }
+
+        function validatePrompt(prompt) {
+            if (!prompt.title || !prompt.content || !prompt.metadata) return false;
+            if (!prompt.metadata.model || !prompt.metadata.createdAt) return false;
+            return true;
+        }
+
+        function exportPrompts() {
+            const prompts = getPrompts();
+            // Validate all prompts
+            const validPrompts = prompts.filter(validatePrompt);
+            const stats = getPromptStats(validPrompts);
+            const exportData = {
+                version: EXPORT_VERSION,
+                exportedAt: new Date().toISOString(),
+                statistics: stats,
+                prompts: validPrompts
+            };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `prompts_export_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // Import function
+        function importPromptsFromFile(file, onComplete) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let imported;
+                try {
+                    imported = JSON.parse(e.target.result);
+                } catch (err) {
+                    alert('Invalid JSON file.');
+                    if (onComplete) onComplete(false, 'Invalid JSON');
+                    return;
+                }
+                // Validate schema
+                if (!imported.version || !imported.prompts || !Array.isArray(imported.prompts)) {
+                    alert('File format is not compatible.');
+                    if (onComplete) onComplete(false, 'Schema error');
+                    return;
+                }
+                if (imported.version !== EXPORT_VERSION) {
+                    alert('Version mismatch. Import may not be fully compatible.');
+                }
+                // Check for duplicate IDs (using createdAt as unique key)
+                const existing = getPrompts();
+                const existingKeys = new Set(existing.map(p => p.metadata?.createdAt));
+                const importedKeys = new Set(imported.prompts.map(p => p.metadata?.createdAt));
+                const duplicates = imported.prompts.filter(p => existingKeys.has(p.metadata?.createdAt));
+
+                // Ask user: merge or replace
+                let action = 'merge';
+                if (duplicates.length > 0) {
+                    action = confirm(`${duplicates.length} duplicate prompts found. Click OK to merge (skip duplicates), Cancel to replace all existing prompts.`) ? 'merge' : 'replace';
+                }
+
+                // Backup existing data
+                const backup = JSON.stringify(existing);
+
+                try {
+                    if (action === 'replace') {
+                        savePrompts(imported.prompts);
+                    } else {
+                        // Merge: skip duplicates, add new
+                        const merged = [...existing];
+                        imported.prompts.forEach(p => {
+                            if (!existingKeys.has(p.metadata?.createdAt)) {
+                                merged.push(p);
+                            }
+                        });
+                        savePrompts(merged);
+                    }
+                    renderPrompts();
+                    if (onComplete) onComplete(true);
+                } catch (err) {
+                    // Rollback on failure
+                    savePrompts(JSON.parse(backup));
+                    alert('Import failed. Data was restored. Error: ' + err.message);
+                    if (onComplete) onComplete(false, err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
     // --- Metadata Tracking Functions ---
     function estimateTokens(text, isCode) {
         if (typeof text !== 'string') throw new Error('Text must be a string');
