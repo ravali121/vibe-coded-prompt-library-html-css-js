@@ -4,7 +4,61 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('prompt-form');
     const titleInput = document.getElementById('prompt-title');
     const contentInput = document.getElementById('prompt-content');
+    const modelInput = document.getElementById('prompt-model');
     const promptsList = document.getElementById('prompts-list');
+
+    // --- Metadata Tracking Functions ---
+    function estimateTokens(text, isCode) {
+        if (typeof text !== 'string') throw new Error('Text must be a string');
+        const wordCount = text.trim().split(/\s+/).length;
+        const charCount = text.length;
+        let min = 0.75 * wordCount;
+        let max = 0.25 * charCount;
+        if (isCode) {
+            min *= 1.3;
+            max *= 1.3;
+        }
+        min = Math.round(min);
+        max = Math.round(max);
+        let confidence = 'high';
+        const avg = (min + max) / 2;
+        if (avg >= 1000 && avg < 5000) confidence = 'medium';
+        if (avg >= 5000) confidence = 'low';
+        return { min, max, confidence };
+    }
+
+    function trackModel(modelName, content) {
+        if (typeof modelName !== 'string' || !modelName.trim())
+            throw new Error('Model name must be a non-empty string');
+        if (modelName.length > 100)
+            throw new Error('Model name must be at most 100 characters');
+        if (typeof content !== 'string' || !content.trim())
+            throw new Error('Content must be a non-empty string');
+        const createdAt = new Date().toISOString();
+        const tokenEstimate = estimateTokens(content, false);
+        return {
+            model: modelName.trim(),
+            createdAt,
+            updatedAt: createdAt,
+            tokenEstimate
+        };
+    }
+
+    function updateTimestamps(metadata) {
+        if (!metadata || typeof metadata !== 'object')
+            throw new Error('Metadata must be an object');
+        const now = new Date().toISOString();
+        if (!metadata.createdAt || isNaN(Date.parse(metadata.createdAt)))
+            throw new Error('createdAt must be a valid ISO 8601 string');
+        if (Date.parse(now) < Date.parse(metadata.createdAt))
+            throw new Error('updatedAt cannot be before createdAt');
+        return { ...metadata, updatedAt: now };
+    }
+
+    function humanDate(iso) {
+        const d = new Date(iso);
+        return d.toLocaleString();
+    }
 
     function getPrompts() {
         return JSON.parse(localStorage.getItem('prompts') || '[]');
@@ -16,6 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderPrompts() {
         const prompts = getPrompts();
+        // Sort by createdAt descending
+        prompts.sort((a, b) => {
+            const aDate = a.metadata?.createdAt || '';
+            const bDate = b.metadata?.createdAt || '';
+            return Date.parse(bDate) - Date.parse(aDate);
+        });
         promptsList.innerHTML = '';
         if (prompts.length === 0) {
             promptsList.innerHTML = '<p style="color:#b6c2d1;text-align:center;">No prompts saved yet.</p>';
@@ -24,6 +84,24 @@ document.addEventListener('DOMContentLoaded', () => {
         prompts.forEach((prompt, idx) => {
             const card = document.createElement('div');
             card.className = 'prompt-card';
+
+            // Metadata display
+            const meta = prompt.metadata || {};
+            const modelDiv = document.createElement('div');
+            modelDiv.className = 'model-name';
+            modelDiv.textContent = `Model: ${meta.model || 'N/A'}`;
+
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'prompt-meta';
+            metaDiv.innerHTML = `
+                <span class="timestamp">Created: ${meta.createdAt ? humanDate(meta.createdAt) : 'N/A'}</span> |
+                <span class="timestamp">Updated: ${meta.updatedAt ? humanDate(meta.updatedAt) : 'N/A'}</span>
+            `;
+
+            const tokenDiv = document.createElement('div');
+            if (meta.tokenEstimate) {
+                tokenDiv.innerHTML = `Tokens: <span class="confidence-${meta.tokenEstimate.confidence}">${meta.tokenEstimate.min} - ${meta.tokenEstimate.max} (${meta.tokenEstimate.confidence})</span>`;
+            }
 
             const title = document.createElement('div');
             title.className = 'prompt-title';
@@ -89,6 +167,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 deletePrompt(idx);
             };
 
+            card.appendChild(modelDiv);
+            card.appendChild(metaDiv);
+            card.appendChild(tokenDiv);
             card.appendChild(title);
             card.appendChild(contentPreview);
             card.appendChild(ratingContainer);
@@ -210,9 +291,17 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const title = titleInput.value.trim();
         const content = contentInput.value.trim();
-        if (!title || !content) return;
+        const modelName = modelInput.value.trim();
+        if (!title || !content || !modelName) return;
+        let metadata;
+        try {
+            metadata = trackModel(modelName, content);
+        } catch (err) {
+            alert(err.message);
+            return;
+        }
         const prompts = getPrompts();
-        prompts.unshift({ title, content });
+        prompts.unshift({ title, content, metadata });
         savePrompts(prompts);
         form.reset();
         renderPrompts();

@@ -1,4 +1,65 @@
-.notes-section {
+/* Prompt Card Styles */
+.prompt-card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin: 1em 0;
+    padding: 1em;
+    background: #f9f9f9;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+.prompt-meta {
+    font-size: 0.95em;
+    margin-top: 0.5em;
+}
+.model-name {
+    font-weight: bold;
+    color: #2d3743;
+    margin-bottom: 2px;
+}
+.confidence-high {
+    color: green;
+    font-weight: bold;
+}
+.confidence-medium {
+    color: orange;
+    font-weight: bold;
+}
+.confidence-low {
+    color: red;
+    font-weight: bold;
+}
+.timestamp {
+    color: #555;
+}
+
+.prompt-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-top: 0.5em;
+    margin-bottom: 0.2em;
+}
+.prompt-content-preview {
+    font-size: 0.98em;
+    color: #23272e;
+    margin-bottom: 0.5em;
+}
+
+.delete-btn {
+    background: #e11d48;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 14px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.18s;
+}
+.delete-btn:hover {
+    background: #be123c;
+}
+
+/* ...existing code... */
     margin-top: 8px;
     display: flex;
     flex-direction: column;
