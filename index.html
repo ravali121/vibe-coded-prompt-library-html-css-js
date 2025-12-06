@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Library</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Prompt Library</h1>
+        <form id="prompt-form">
+            <div class="form-group">
+                <label for="prompt-title">Title</label>
+                <input type="text" id="prompt-title" name="prompt-title" required maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="prompt-content">Content</label>
+                <textarea id="prompt-content" name="prompt-content" rows="4" required maxlength="1000"></textarea>
+            </div>
+            <button type="submit" id="save-prompt">Save Prompt</button>
+        </form>
+        <hr>
+        <div id="prompts-list" class="prompts-list"></div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
